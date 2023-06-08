@@ -1,17 +1,15 @@
-import typing
+
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import *
 from PyQt5.QtWidgets import QWidget
 from .pressure_monitor import PressureMonitor
-from PyQt5.QtGui import QTextCursor
 
 from .q_logger import QLogger
 
-from utils import Observer
+from utils import event
 
-import identifies
 
-class SerialWidget(Observer, QWidget):
+class SerialWidget(event.Listener, QWidget, threaded=True):
     def __init__(self) -> None:
         super().__init__()
 
@@ -29,29 +27,48 @@ class SerialWidget(Observer, QWidget):
         communication_section.addWidget(self.serial_input, 1)
         main_layout.addLayout(communication_section, 10)
 
-        pressure_layout = QGridLayout()
+        pressure_layout = QVBoxLayout()
+        monitors = QGridLayout()
         for i in range(3):
             for j in range(3):
                 pressure_value = PressureMonitor()
                 pressure_value.setFrameStyle(QFrame.Shape.Panel | QFrame.Shadow.Sunken)
-                pressure_layout.addWidget(pressure_value, i, j)
+                monitors.addWidget(pressure_value, i, j)
+        
+        pressure_layout.addLayout(monitors, 5)
+
+        self.freeze_button = QPushButton("freeze")
+        self.freeze_button.clicked.connect(self.freeze_btn_click)
+        self.freeze = False
+        self.was_freeze = False
+
+        pressure_layout.addWidget(self.freeze_button)
                 
         main_layout.addLayout(pressure_layout, 10)
-        self.pressure_layout = pressure_layout
+        self.pressure_layout = monitors
     
-    def update(self, data):
-        data_type = data[identifies.SERIAL_DATA_TYPE]
-        if data_type == identifies.SERIAL_DATA_TYPE_DATA:
-            messages: list[str] = data[identifies.SERIAL_DATA_STRING]
-            self.logger.add_message(*messages)
-            
-            for numeric_data in data[identifies.SERIAL_DATA_NUMERIC]:
-                for i in range(3):
-                    for j in range(3):
-                        index = i*3+j
-                        monitor: PressureMonitor = self.pressure_layout.itemAt(index).widget()
-                        pressure_value = numeric_data[index]
-                        monitor.add_pressure(pressure_value)
-
-        elif data_type == identifies.SERIAL_DATA_TYPE_EXIT:
-            pass
+    def freeze_btn_click(self):
+        self.freeze = self.freeze_button.text() == "freeze"
+        if self.freeze:
+            self.was_freeze = True
+            self.freeze_button.setText("unfreeze")
+        else:
+            self.freeze_button.setText("freeze")
+    
+    @event.listen()
+    def numeric_received(self, event: event.SerialNumericReceiveEvent):
+        if self.freeze:
+            return
+        
+        numeric_data = event.data
+        for i in range(3):
+            for j in range(3):
+                index = i*3+j
+                monitor: PressureMonitor = self.pressure_layout.itemAt(index).widget()
+                pressure_value = numeric_data[index]
+                monitor.add_pressure(pressure_value, self.was_freeze)
+        self.was_freeze = False
+    
+    @event.listen()
+    def string_received(self, event: event.SerialStringReceiveEvent):
+        self.logger.add_message(event.data)

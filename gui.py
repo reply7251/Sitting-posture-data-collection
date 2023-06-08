@@ -25,8 +25,6 @@ import ctypes
 
 import configparser
 
-from utils import Observable, Observer
-
 import identifies
 
 def is_admin():
@@ -46,8 +44,6 @@ def uac_reload():
 
 #uac_reload()
 
-
-#matplotlib.use("Qt5Agg")
 
 bauds = (110, 300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 38400, 57600, 115200, 128000, 256000)
 
@@ -99,7 +95,7 @@ class SelectCOMMenu(QMenu):
             self.addAction(action)
 
 
-class MainWindow(Observable, QtWidgets.QMainWindow):
+class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
 
@@ -132,24 +128,20 @@ class MainWindow(Observable, QtWidgets.QMainWindow):
 
         self.serial_widget = SerialWidget()
         main_layout.addWidget(self.serial_widget,5)
-        self.add_observer(self.serial_widget)
+        #self.add_observer(self.serial_widget)
 
         self.record_widget = RecordWidget(self.config[identifies.CONFIG_POSTURES], self.config[identifies.CONFIG_FILES])
         main_layout.addWidget(self.record_widget,2)
-        self.add_observer(self.record_widget)
+        #self.add_observer(self.record_widget)
 
         self.serial_data = {identifies.SERIAL_DATA_NUMERIC:[0]*9, identifies.SERIAL_DATA_STRING:[]}
         self.serial_thread = TestSerialThread()
         self.serial_thread.start()
-        self.timer = QtCore.QTimer()
-        self.timer.setInterval(30)
-        self.timer.timeout.connect(self.timer_tick)
-        self.timer.start()
 
         self.com_detect_timer = QtCore.QTimer()
         self.com_detect_timer.setInterval(1000)
         self.com_detect_timer.timeout.connect(self.update_coms)
-        self.timer.start()
+        self.com_detect_timer.start()
     
     def build_menu(self):
         menu = self.menuBar()
@@ -226,30 +218,12 @@ class MainWindow(Observable, QtWidgets.QMainWindow):
             self.serial_thread = Mega2560SerialThread(self.com, self.baud)
             self.serial_thread.start()
     
-    def timer_tick(self):
-        data = {
-            identifies.SERIAL_DATA_STRING: [], 
-            identifies.SERIAL_DATA_NUMERIC: [], 
-            identifies.SERIAL_DATA_TYPE: identifies.SERIAL_DATA_TYPE_DATA
-            }
-        if self.serial_thread:
-            self.serial_thread.message_lock.acquire()
-            data[identifies.SERIAL_DATA_STRING].extend(self.serial_thread.messages)
-            self.serial_thread.messages = []
-            self.serial_thread.message_lock.release()
-            
-            self.serial_thread.numeric_lock.acquire()
-            data[identifies.SERIAL_DATA_NUMERIC].extend(self.serial_thread.numerics)
-            self.serial_thread.numerics = []
-            self.serial_thread.numeric_lock.release()
-        self.send(data)
-        #self.serial_widget.update(data)
-    
         
     def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
+        event.ExitEvent().fire()
+        
         with open(identifies.CONFIG_PATH, 'w') as config_file:
             self.config.write(config_file)
-        self.send({identifies.SERIAL_DATA_TYPE: identifies.SERIAL_DATA_TYPE_EXIT})
 
         return super().closeEvent(a0)
         

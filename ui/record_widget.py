@@ -6,8 +6,6 @@ from PyQt5.QtWidgets import QWidget
 
 from configparser import SectionProxy
 
-from utils import Observer
-
 import csv
 
 import identifies
@@ -17,8 +15,10 @@ from .sync_widget import SyncLineEdit
 
 from utils.other import is_number
 
+from utils import event
 
-class RecordWidget(Observer, QWidget):
+
+class RecordWidget(event.Listener, QWidget, threaded=True):
     def __init__(self, postures: SectionProxy, file_config: SectionProxy) -> None:
         super().__init__()
 
@@ -76,21 +76,6 @@ class RecordWidget(Observer, QWidget):
                 .with_widget(self.record_btn)
                 .with_widget(self.stop_btn)
         , 2)
-        """
-        add_posture_layout = QHBoxLayout()
-        add_posture_layout.addWidget(self.add_posture_label)
-        add_posture_layout.addWidget(self.add_posture_inp, 10)
-        main_layout.addLayout(add_posture_layout)
-
-        main_layout.addWidget(self.posture_list, 10)
-        
-        button_layout = QHBoxLayout()
-        button_layout.addWidget(self.record_btn)
-        button_layout.addWidget(self.stop_btn)
-
-        main_layout.addLayout(button_layout,2)
-        """
-
         
         self.record_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.stop_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -156,20 +141,6 @@ class RecordWidget(Observer, QWidget):
     def stop(self):
         self.recording = False
         self.update_buttons()
-
-    def update(self, data):
-        data_type = data[identifies.SERIAL_DATA_TYPE]
-        if data_type == identifies.SERIAL_DATA_TYPE_DATA:
-            if self.recording:
-                self.prepare_csv()
-                for line in data[identifies.SERIAL_DATA_NUMERIC]:
-                    self.csv_writer.writerow(list(self.get_height_weight()) + line)
-
-        elif data_type == identifies.SERIAL_DATA_TYPE_EXIT:
-            if self.file:
-                self.file.close()
-            pass
-        return super().update(data)
     
     def prepare_csv(self):
         save_file_path = self.file_config[identifies.CONFIG_FILES_SAVE]
@@ -179,3 +150,14 @@ class RecordWidget(Observer, QWidget):
             self.last_open = save_file_path
             self.file = open(save_file_path, "a", newline="")
             self.csv_writer = csv.writer(self.file)
+    
+    @event.listen()
+    def serial_numeric_received(self, event: event.SerialNumericReceiveEvent):
+        if self.recording:
+            self.prepare_csv()
+            self.csv_writer.writerow(list(self.get_height_weight()) + event.data)
+    
+    @event.listen()
+    def on_exit(self, event: event.ExitEvent):
+        if self.file:
+            self.file.close()

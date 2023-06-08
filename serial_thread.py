@@ -7,15 +7,12 @@ import time
 import utils.wifi as wifi
 
 import socket
+from utils import event
 
 class SerialThread(QtCore.QThread):
     def __init__(self) -> None:
         super().__init__()
-        self.messages = []
-        self.numerics = []
         self.running = True
-        self.message_lock = threading.Lock()
-        self.numeric_lock = threading.Lock()
     
     def run(self):
         pass
@@ -31,27 +28,26 @@ class Mega2560SerialThread(SerialThread):
     
     def run(self):
         while self.running:
-            with serial.Serial(self.port, self.baud) as self.serial:
-                try:
-                    message = self.serial.readline()
-                    message = message.decode()
-                except:
-                    message = str(message)
-                numeric = []
-                for sub in message.split(","):
-                    sub = sub.strip()
+            try:
+                with serial.Serial(self.port, self.baud) as self.serial:
                     try:
-                        numeric.append(float(sub))
+                        message = self.serial.readline()
+                        message = message.decode()
                     except:
-                        break
-                else:
-                    self.numeric_lock.acquire()
-                    self.numerics.append(numeric)
-                    self.numeric_lock.release()
-                    continue
-                self.message_lock.acquire()
-                self.messages.append(message)
-                self.message_lock.release()
+                        message = str(message)
+                    numeric = []
+                    for sub in message.split(","):
+                        sub = sub.strip()
+                        try:
+                            numeric.append(float(sub))
+                        except:
+                            break
+                    else:
+                        event.SerialNumericReceiveEvent(numeric).fire()
+                        continue
+                    event.SerialStringReceiveEvent(message).fire()
+            except:
+                time.sleep(1)
     
     def stop(self):
         super().stop()
@@ -173,13 +169,9 @@ class WifiThread(SerialThread):
             except:
                 break
         else:
-            self.numeric_lock.acquire()
-            self.numerics.append(numeric)
-            self.numeric_lock.release()
+            event.SerialNumericReceiveEvent(numeric).fire()
             return
-        self.message_lock.acquire()
-        self.messages.append(message)
-        self.message_lock.release()
+        event.SerialStringReceiveEvent(message).fire()
     
         
 
@@ -192,14 +184,10 @@ class TestSerialThread(SerialThread):
     
     def run(self):
         while self.running:
-            self.message_lock.acquire()
-            self.messages.append(f"test {self.counter}")
-            self.message_lock.release()
+            event.SerialStringReceiveEvent(f"test {self.counter}").fire()
             
             numeric = [math.sin(self.counter*math.pi/256 + (i*math.pi/4.5))*512+512 for i in range(9)]
-            self.numeric_lock.acquire()
-            self.numerics.append(numeric)
-            self.numeric_lock.release()
+            event.SerialNumericReceiveEvent(numeric).fire()
             self.counter += 1
             self.counter %= 1024
             time.sleep(0.01)
