@@ -29,11 +29,11 @@ class SerialWidget(event.Listener, QWidget, threaded=True):
 
         pressure_layout = QVBoxLayout()
         monitors = QGridLayout()
-        for i in range(3):
-            for j in range(3):
+        for j in range(3):
+            for i in range(3):
                 pressure_value = PressureMonitor()
                 pressure_value.setFrameStyle(QFrame.Shape.Panel | QFrame.Shadow.Sunken)
-                monitors.addWidget(pressure_value, i, j)
+                monitors.addWidget(pressure_value, 3-i, 3-j)
         
         pressure_layout.addLayout(monitors, 5)
 

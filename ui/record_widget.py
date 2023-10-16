@@ -16,7 +16,9 @@ from .sync_widget import SyncLineEdit
 from utils.other import is_number
 
 from utils import event
+import time
 
+RECORD_INTERVAL = 3
 
 class RecordWidget(event.Listener, QWidget, threaded=True):
     def __init__(self, postures: SectionProxy, file_config: SectionProxy) -> None:
@@ -32,6 +34,8 @@ class RecordWidget(event.Listener, QWidget, threaded=True):
         self.last_open = None
         self.file = None
         self.csv_writer = None
+
+        self.last_record_tick = time.time()
 
         self.build()
         self.update_buttons()
@@ -91,8 +95,6 @@ class RecordWidget(event.Listener, QWidget, threaded=True):
                 self.posture_list.takeItem(self.posture_list.selectedIndexes()[0].row())
                 self.selected_posture = None
                 self.update_buttons()
-            else:
-                return super().keyPressEvent(e)
         self.posture_list.keyPressEvent = keyPressEvent
         self.posture_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
 
@@ -140,11 +142,15 @@ class RecordWidget(event.Listener, QWidget, threaded=True):
 
     def stop(self):
         self.recording = False
+        if self.file:
+            self.file.close()
+            self.file = None
+
         self.update_buttons()
     
     def prepare_csv(self):
         save_file_path = self.file_config[identifies.CONFIG_FILES_SAVE]
-        if save_file_path and self.last_open != save_file_path:
+        if save_file_path and (self.last_open != save_file_path or self.file == None):
             if self.file:
                 self.file.close()
             self.last_open = save_file_path
@@ -153,9 +159,10 @@ class RecordWidget(event.Listener, QWidget, threaded=True):
     
     @event.listen()
     def serial_numeric_received(self, event: event.SerialNumericReceiveEvent):
-        if self.recording:
+        if self.recording and time.time() - self.last_record_tick > RECORD_INTERVAL:
             self.prepare_csv()
-            self.csv_writer.writerow(list(self.get_height_weight()) + event.data)
+            self.csv_writer.writerow(list(self.get_height_weight()) + [self.selected_posture] + event.data[:-2])
+            self.last_record_tick = time.time()
     
     @event.listen()
     def on_exit(self, event: event.ExitEvent):

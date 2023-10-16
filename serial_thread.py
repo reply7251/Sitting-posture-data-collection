@@ -30,22 +30,23 @@ class Mega2560SerialThread(SerialThread):
         while self.running:
             try:
                 with serial.Serial(self.port, self.baud) as self.serial:
-                    try:
-                        message = self.serial.readline()
-                        message = message.decode()
-                    except:
-                        message = str(message)
-                    numeric = []
-                    for sub in message.split(","):
-                        sub = sub.strip()
+                    while self.running:
                         try:
-                            numeric.append(float(sub))
+                            message = self.serial.readline()
+                            message = message.decode()
                         except:
-                            break
-                    else:
-                        event.SerialNumericReceiveEvent(numeric).fire()
-                        continue
-                    event.SerialStringReceiveEvent(message).fire()
+                            message = str(message)
+                        numeric = []
+                        for sub in message.split(","):
+                            sub = sub.strip()
+                            try:
+                                numeric.append(float(sub))
+                            except:
+                                break
+                        else:
+                            event.SerialNumericReceiveEvent(numeric).fire()
+                            continue
+                        event.SerialStringReceiveEvent(message).fire()
             except:
                 time.sleep(1)
     
@@ -97,12 +98,12 @@ class WifiThread(SerialThread):
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                     sock.connect((ip_address, port))
 
-                    sock.sendall("ping".encode())
+                    sock.sendall("ping\n".encode())
                     response = self.wait_message(connection)
                     if not response.decode().startswith("pong"):
                         continue
 
-                    sock.sendall(f"APdata:\n{self.target_ssid}\n{self.target_pwd}\n{local_ip}\n{local_port}".encode())
+                    sock.sendall(f"APdata:\t{self.target_ssid}\t{self.target_pwd}\t{local_ip}\t{local_port}".encode())
                     response = self.wait_message(connection)
                     if not response.decode().startswith("received"):
                         success = True
@@ -181,15 +182,15 @@ class TestSerialThread(SerialThread):
     def __init__(self) -> None:
         super().__init__()
         self.counter = 0
+        self.linspace = [math.sin(i/180*math.pi)*512+512 for i in range(360)]
     
     def run(self):
         while self.running:
             event.SerialStringReceiveEvent(f"test {self.counter}").fire()
-            
-            numeric = [math.sin(self.counter*math.pi/256 + (i*math.pi/4.5))*512+512 for i in range(9)]
+            numeric = [self.linspace[(self.counter+i*60)%360] for i in range(9)]
             event.SerialNumericReceiveEvent(numeric).fire()
-            self.counter += 1
-            self.counter %= 1024
+            self.counter += 2
+            self.counter %= 360
             time.sleep(0.01)
 
 

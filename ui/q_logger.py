@@ -13,7 +13,7 @@ class QLogger(QPlainTextEdit):
     def add_message(self, *messages):
         self.appendPlainText("\n".join(messages))
         cursor = self.textCursor()
-        while self.document().lineCount() > 10000:
+        while self.document().lineCount() > 1000:
             cursor.movePosition(QTextCursor.MoveOperation.Start)
             cursor.select(QTextCursor.SelectionType.LineUnderCursor)
             cursor.removeSelectedText()

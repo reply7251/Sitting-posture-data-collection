@@ -5,8 +5,11 @@ from PyQt5.QtCore import QSize, QTimer
 
 from utils import event
 
-history_limit = 33 * 5
-tick_time = 33
+
+PIXMAP_WIDTH = 300
+SCALE_X = 2
+history_limit = int(PIXMAP_WIDTH / SCALE_X)
+tick_time = 50
 
 class PressureMonitor(QLabel):
     pen_pressure = QPen(QColor(255,0,0), 15)
@@ -17,18 +20,16 @@ class PressureMonitor(QLabel):
         super().__init__()
         self.history = []
         self.setScaledContents(True)
-        self._pixmap = QtGui.QPixmap(QSize(300, 1024))
+        self._pixmap = QtGui.QPixmap(QSize(PIXMAP_WIDTH, 1024))
 
         self.pixmap_updated = True
 
         self.update_timer = QTimer()
         self.update_timer.setInterval(tick_time)
-        self.update_timer.timeout.connect(self.update)
+        self.update_timer.timeout.connect(self.repaint_pixmap)
         self.update_timer.start()
     
     def paintEvent(self, a0: QPaintEvent) -> None:
-        if not self.pixmap_updated:
-            self.repaint_pixmap()
         
         painter = QPainter(self)
         width = self.width()
@@ -44,6 +45,8 @@ class PressureMonitor(QLabel):
         return super().paintEvent(a0)
 
     def repaint_pixmap(self):
+        if self.pixmap_updated:
+            return
         pixmap = self._pixmap
         size = pixmap.size()
 
@@ -60,13 +63,14 @@ class PressureMonitor(QLabel):
 
         for i, (pressure, freezed) in enumerate(self.history):
             if freezed:
-                path.moveTo(i, pressure)
-            path.lineTo(i, pressure)
+                path.moveTo(i*SCALE_X, pressure)
+            path.lineTo(i*SCALE_X, pressure)
 
         painter.drawPath(path)
         painter.end()
         
         self.pixmap_updated = True
+        
         self.update()
 
     def add_pressure(self, value, was_freezed = False):
