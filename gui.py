@@ -137,11 +137,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.serial_data = {identifies.SERIAL_DATA_NUMERIC:[0]*9, identifies.SERIAL_DATA_STRING:[]}
         self.serial_thread = TestSerialThread()
         self.serial_thread.start()
-
-        self.com_detect_timer = QtCore.QTimer()
-        self.com_detect_timer.setInterval(1000)
-        self.com_detect_timer.timeout.connect(self.update_coms)
-        self.com_detect_timer.start()
     
     def build_menu(self):
         menu = self.menuBar()
@@ -149,7 +144,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.serial_setting_menu = menu.addMenu("Serial setting")
 
         self.select_COM_menu = self.serial_setting_menu.addMenu("COM")
-        self.update_coms()
+        self.select_COM_menu.aboutToShow.connect(self.update_coms)
         self.select_baud_menu = self.serial_setting_menu.addMenu("baud")
 
         action = self.serial_setting_menu.addAction("monitor")
