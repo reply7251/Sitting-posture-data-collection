@@ -161,7 +161,7 @@ class RecordWidget(event.Listener, QWidget, threaded=True):
     def serial_numeric_received(self, event: event.SerialNumericReceiveEvent):
         if self.recording and time.time() - self.last_record_tick > RECORD_INTERVAL:
             self.prepare_csv()
-            self.csv_writer.writerow(list(self.get_height_weight()) + [self.selected_posture] + event.data[:-2])
+            self.csv_writer.writerow([self.selected_posture,*self.get_height_weight() , self.BMI()] + event.data[:-2])
             self.last_record_tick = time.time()
     
     @event.listen()
